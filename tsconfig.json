@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "declaration": false,
+    "mapRoot": "./",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "outDir": "./src/js",
+    "sourceMap": true,
+    "target": "es5",
+    "lib": ["esnext","dom"]
+  },
+  "include": [
+    "*"
+  ]
+}
