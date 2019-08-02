@@ -1,5 +1,14 @@
 import http from 'http';
 import gm from 'gm';
+import { createHash } from 'crypto';
+
+function md5(input:string){
+  return createHash('md5').update(input).digest("hex");
+}
+/*
+var crypto = require('crypto');
+crypto.createHash('md5').update(data).digest("hex");
+*/
 
 interface RequestOptions{
   url: URL,
@@ -58,6 +67,10 @@ const server = http.createServer((req, resp) =>{
     resp.end("")
     return;
   }
+  const origin = url.searchParams.get("origin") || url.pathname;
+  url.searchParams.delete("origin");
+
+  const etag = [origin, url.search].map(md5).join("/");
   const img = gm(req);
   //@ts-ignore
   img._options.imageMagick = true;
@@ -65,7 +78,6 @@ const server = http.createServer((req, resp) =>{
   url.searchParams.forEach((value, key) => {
     const filter = filters.get(key);
     if(filter){
-      console.log("applying filter:", key, value)
       filter(img, value, {url, responseHeaders});
     }
   })
@@ -89,10 +101,11 @@ const server = http.createServer((req, resp) =>{
     dataOut = buf.length;
     resp.writeHead(200,Object.assign({
       "content-type": req.headers["content-type"],
-      "content-length": buf.length
+      "content-length": buf.length,
+      etag: etag
     }, responseHeaders));
     resp.end(buf);
-    console.log(`${url.searchParams.get("origin")}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
+    console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
   })
 })
 server.listen(process.env.PORT || 8000);
