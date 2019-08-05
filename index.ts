@@ -50,6 +50,7 @@ const server = http.createServer((req, resp) =>{
   if((req.method === "HEAD" || req.method === "GET") && req.url === "/__status"){
     resp.writeHead(200);
     resp.end("ok")
+    return
   }
   if(authToken){
     const auth = req.headers['authorization'] || "";
