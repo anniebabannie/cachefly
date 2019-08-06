@@ -50,6 +50,7 @@ const server = http.createServer((req, resp) =>{
   if((req.method === "HEAD" || req.method === "GET") && req.url === "/__status"){
     resp.writeHead(200, { connection: "close"} );
     resp.end("ok")
+    console.log([req.connection.remoteAddress, "/__status"].join(" "))
     return
   }
   if(authToken){
