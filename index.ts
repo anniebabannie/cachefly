@@ -47,10 +47,10 @@ const filters = new Map<string,FilterFunction> ([
 const authToken = process.env.AUTH_TOKEN;
 // fly deploy:image registry-1.docker.io/nginxdemos/hello:latest
 const server = http.createServer((req, resp) =>{
+  console.log([req.connection.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
   if((req.method === "HEAD" || req.method === "GET") && req.url === "/__status"){
     resp.writeHead(200, { connection: "close"} );
     resp.end("ok")
-    console.log([req.connection.remoteAddress, "/__status"].join(" "))
     return
   }
   if(authToken){
