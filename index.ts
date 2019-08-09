@@ -110,7 +110,6 @@ const server = http.createServer((req, resp) =>{
     console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
   })
 })
-server.listen(10000)
 server.listen(process.env.PORT || 8000);
-//console.log(`Server listening on port ${process.env.PORT || 8000}`)
+console.log(`Server listening on port ${process.env.PORT || 8000}`)
 console.log(`Auth token: ${authToken}`)
