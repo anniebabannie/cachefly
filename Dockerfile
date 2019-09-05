@@ -1,3 +1,4 @@
+ARG NODE_ENV=production
 FROM node:12-alpine
 
 RUN apk update && apk add imagemagick && rm -rf /var/cache/apk/*
@@ -8,7 +9,8 @@ WORKDIR /app
 COPY package.json .
 COPY yarn.lock .
 
-RUN yarn install
+RUN yarn install --production
+#RUN npm install --production
 
 COPY . .
 

@@ -1,4 +1,4 @@
-import http from 'http';
+import http2 from 'http2';
 import gm from 'gm';
 import { createHash } from 'crypto';
 
@@ -12,7 +12,7 @@ crypto.createHash('md5').update(data).digest("hex");
 
 interface RequestOptions{
   url: URL,
-  responseHeaders: http.OutgoingHttpHeaders
+  responseHeaders: http2.OutgoingHttpHeaders
 }
 interface FilterFunction{
   (img: gm.State, value: any, opts: RequestOptions): void;
@@ -46,8 +46,8 @@ const filters = new Map<string,FilterFunction> ([
 
 const authToken = process.env.AUTH_TOKEN;
 // fly deploy:image registry-1.docker.io/nginxdemos/hello:latest
-const server = http.createServer((req, resp) =>{
-  console.log([req.connection.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
+const server = http2.createServer((req, resp) =>{
+  console.log([req.httpVersion, req.socket.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
   if((req.method === "HEAD" || req.method === "GET") && req.url === "/__status"){
     resp.writeHead(200, { connection: "close"} );
     resp.end("ok")
@@ -62,7 +62,7 @@ const server = http.createServer((req, resp) =>{
       return;
     }
   }
-  const responseHeaders: http.OutgoingHttpHeaders = {}
+  const responseHeaders: http2.OutgoingHttpHeaders = {}
   const url = new URL(req.url, "http://magick");
   if(req.method !== "POST"){
     resp.writeHead(405);
@@ -110,6 +110,6 @@ const server = http.createServer((req, resp) =>{
     console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
   })
 })
-server.listen(process.env.PORT || 8000);
-console.log(`Server listening on port ${process.env.PORT || 8000}`)
+server.listen(8080);
+console.log(`http2 server listening on port 8080`)
 console.log(`Auth token: ${authToken}`)
