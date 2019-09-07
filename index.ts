@@ -48,6 +48,7 @@ const authToken = process.env.AUTH_TOKEN;
 // fly deploy:image registry-1.docker.io/nginxdemos/hello:latest
 const server = http2.createServer((req, resp) =>{
   console.log([req.httpVersion, req.socket.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
+
   if((req.method === "HEAD" || req.method === "GET") && req.url === "/__status"){
     resp.writeHead(200, { connection: "close"} );
     resp.end("ok")
@@ -109,6 +110,9 @@ const server = http2.createServer((req, resp) =>{
     resp.end(buf);
     console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
   })
+})
+server.on("connection", (socket) => {
+  console.log([socket.remoteAddress, "TCP connection"].join(" "))
 })
 server.listen(8080);
 console.log(`http2 server listening on port 8080`)
