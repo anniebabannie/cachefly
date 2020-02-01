@@ -35,7 +35,8 @@ const filters = new Map<string,FilterFunction> ([
   )],
   ["width", (img, value, {url}) => img.resize(
     intOrUndefined(value),
-    intOrUndefined(url.searchParams.get("height"))
+    intOrUndefined(url.searchParams.get("height")),
+    url.searchParams.get("crop") == "stretch" ? "!" : undefined
   )],
   ["quality", (img, value) => img.quality(intOrUndefined(value))],
   ["format", (img, value, {responseHeaders}) => {
