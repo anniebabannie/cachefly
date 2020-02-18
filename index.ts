@@ -141,9 +141,12 @@ const server = http.createServer(async (req, resp) =>{
 
   // original magick server that's now inside a queue for concurrency control...
 
-  console.trace("imagemagick queue length", q.length)
+  console.debug("imagemagick queue length", q.length)
   
+  let startTime = new Date().getTime();
+
   q.push(function (cb) {
+    const queueTime = new Date().getTime() - startTime
     // const etag = [origin.href, url.search].map(md5).join("/");
     const img = gm(originResp);
     //@ts-ignore
@@ -159,7 +162,7 @@ const server = http.createServer(async (req, resp) =>{
     //const img = gm(req).out("-contrast-stretch","2%", "1%");
     let dataIn = 0;
     let dataOut = 0;
-    let startTime = new Date().getTime();
+
     originResp.on('data', (chunk) => {
       dataIn += chunk.length
     });
@@ -182,7 +185,7 @@ const server = http.createServer(async (req, resp) =>{
       }, responseHeaders));
       resp.end(buf);
       req.socket.end();
-      console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
+      console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, queue:${queueTime}ms, process:${new Date().getTime() - startTime - queueTime}ms`);
       cb()
     })
   })
