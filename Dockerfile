@@ -2,7 +2,7 @@ ARG NODE_ENV=production
 FROM node:12-alpine
 
 RUN apk update && apk add imagemagick && rm -rf /var/cache/apk/*
-RUN npm install -g yarn
+# RUN npm install -g yarn
 
 WORKDIR /app
 
