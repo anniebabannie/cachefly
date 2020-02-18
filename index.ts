@@ -1,6 +1,7 @@
 import http from 'http';
 import gm from 'gm';
 import { createHash } from 'crypto';
+import queue from "queue";
 
 function md5(input:string){
   return createHash('md5').update(input).digest("hex");
@@ -9,6 +10,15 @@ function md5(input:string){
 var crypto = require('crypto');
 crypto.createHash('md5').update(data).digest("hex");
 */
+
+const q = queue({autostart: true, concurrency: 2})
+
+q.start(function (err) {
+  if (err) {
+    console.error("error running queue:", err)
+  }
+  console.log('queue complete')
+})
 
 interface RequestOptions{
   url: URL,
@@ -129,47 +139,52 @@ const server = http.createServer(async (req, resp) =>{
     return
   }
 
-  // original magick server...
+  // original magick server that's now inside a queue for concurrency control...
 
-  // const etag = [origin.href, url.search].map(md5).join("/");
-  const img = gm(originResp);
-  //@ts-ignore
-  img._options.imageMagick = true;
+  console.trace("imagemagick queue length", q.length)
+  
+  q.push(function (cb) {
+    // const etag = [origin.href, url.search].map(md5).join("/");
+    const img = gm(originResp);
+    //@ts-ignore
+    img._options.imageMagick = true;
 
-  url.searchParams.forEach((value, key) => {
-    const filter = filters.get(key);
-    if(filter){
-      filter(img, value, {url, responseHeaders});
-    }
-  })
+    url.searchParams.forEach((value, key) => {
+      const filter = filters.get(key);
+      if(filter){
+        filter(img, value, {url, responseHeaders});
+      }
+    })
 
-  //const img = gm(req).out("-contrast-stretch","2%", "1%");
-  let dataIn = 0;
-  let dataOut = 0;
-  let startTime = new Date().getTime();
-  originResp.on('data', (chunk) => {
-    dataIn += chunk.length
-  });
+    //const img = gm(req).out("-contrast-stretch","2%", "1%");
+    let dataIn = 0;
+    let dataOut = 0;
+    let startTime = new Date().getTime();
+    originResp.on('data', (chunk) => {
+      dataIn += chunk.length
+    });
 
-  img.toBuffer((err, buf) => {
-    if (err){
-      console.trace("error:", err.message);
-      resp.writeHead(500)
-      //@ts-ignore
-      resp.end("error processing image");
-      return;
-    }
-    dataOut = buf.length;
-    resp.writeHead(200, Object.assign({
-      "timing-allow-origin": "*",
-      "content-type": contentType,
-      "content-length": buf.length,
-      etag: originResp.headers['etag'],
-      "last-modified": originResp.headers["last-modified"],
-    }, responseHeaders));
-    resp.end(buf);
-    req.socket.end();
-    console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
+    img.toBuffer((err, buf) => {
+      if (err){
+        console.trace("error:", err.message);
+        resp.writeHead(500)
+        //@ts-ignore
+        resp.end("error processing image");
+        return;
+      }
+      dataOut = buf.length;
+      resp.writeHead(200, Object.assign({
+        "timing-allow-origin": "*",
+        "content-type": contentType,
+        "content-length": buf.length,
+        etag: originResp.headers['etag'],
+        "last-modified": originResp.headers["last-modified"],
+      }, responseHeaders));
+      resp.end(buf);
+      req.socket.end();
+      console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
+      cb()
+    })
   })
 })
 server.on("connection", (socket) => {
