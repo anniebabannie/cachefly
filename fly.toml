@@ -1,4 +1,4 @@
-app = "magick"
+app = "cachefly-magick"
 
 
 [[services]]
