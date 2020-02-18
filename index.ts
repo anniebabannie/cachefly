@@ -78,11 +78,15 @@ function headerOrDefault(req: http.IncomingMessage, name: string, defaultVal : s
 
 const authToken = process.env.AUTH_TOKEN;
 // fly deploy:image registry-1.docker.io/nginxdemos/hello:latest
+const bootTime = new Date();
+let lastQueueLength = 0;
 const server = http.createServer(async (req, resp) =>{
   console.log([req.httpVersion, req.socket.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
 
   if ((req.method === "HEAD" || req.method === "GET") && req.url === "/__status") {
-    console.debug("imagemagick queue length", q.length)
+    const now = new Date();
+    console.debug("imagemagick queue length:", q.length, "last queue length: ", lastQueueLength, "uptime:", (now.getTime() - bootTime.getTime()) / 1000)
+    lastQueueLength = q.length;
     resp.writeHead(200, { connection: "close"} );
     resp.end("ok: " + q.length)
     return
