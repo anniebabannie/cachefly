@@ -131,7 +131,7 @@ const server = http.createServer(async (req, resp) =>{
 
   // original magick server...
 
-  const etag = [origin.href, url.search].map(md5).join("/");
+  // const etag = [origin.href, url.search].map(md5).join("/");
   const img = gm(originResp);
   //@ts-ignore
   img._options.imageMagick = true;
@@ -164,7 +164,7 @@ const server = http.createServer(async (req, resp) =>{
       "timing-allow-origin": "*",
       "content-type": contentType,
       "content-length": buf.length,
-      etag: etag,
+      etag: originResp.headers['etag'],
       "last-modified": originResp.headers["last-modified"],
     }, responseHeaders));
     resp.end(buf);
