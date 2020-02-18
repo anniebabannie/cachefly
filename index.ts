@@ -13,6 +13,13 @@ crypto.createHash('md5').update(data).digest("hex");
 */
 
 const q = queue({autostart: true, concurrency: 4})
+let processedCount = 0
+
+// get notified when jobs complete
+q.on('success', function (result, job) {
+  processedCount += 1
+})
+
 
 q.start(function (err) {
   if (err) {
@@ -83,13 +90,15 @@ const authToken = process.env.AUTH_TOKEN;
 // fly deploy:image registry-1.docker.io/nginxdemos/hello:latest
 const bootTime = new Date();
 let lastQueueLength = 0;
+let lastProcessedCount = 0
 const server = http.createServer(async (req, resp) =>{
   console.log([req.httpVersion, req.socket.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
 
   if ((req.method === "HEAD" || req.method === "GET") && req.url === "/__status") {
     const now = new Date();
-    console.debug("imagemagick queue length:", q.length, "last queue length: ", lastQueueLength, "uptime:", (now.getTime() - bootTime.getTime()) / 1000)
+    console.debug("imagemagick queue length:", q.length, "last queue length: ", lastQueueLength, "processed count:", processedCount, "last processed count:", lastProcessedCount, "uptime:", (now.getTime() - bootTime.getTime()) / 1000)
     lastQueueLength = q.length;
+    lastProcessedCount = processedCount
     resp.writeHead(200, { connection: "close"} );
     resp.end("ok: " + q.length)
     return
@@ -151,8 +160,6 @@ const server = http.createServer(async (req, resp) =>{
 
   // original magick server that's now inside a queue for concurrency control...
 
-  console.debug("imagemagick queue length", q.length)
-  
   let startTime = new Date().getTime();
 
   const inBuf = await originResp.buffer()
