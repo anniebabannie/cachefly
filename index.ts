@@ -2,6 +2,7 @@ import http from 'http';
 import gm from 'gm';
 import { createHash } from 'crypto';
 import queue from "queue";
+import fetch, { Response } from "node-fetch";
 
 function md5(input:string){
   return createHash('md5').update(input).digest("hex");
@@ -36,6 +37,8 @@ function intOrUndefined(raw: string | null | undefined): number | undefined{
   }
   return undefined;
 }
+
+
 
 function fetchOrigial(url: URL): Promise<http.IncomingMessage> {
   return new Promise((resolve, reject) => {
@@ -98,13 +101,14 @@ const server = http.createServer(async (req, resp) =>{
     url.search = headerOrDefault(req, "Image-Operation", "");
   }
   
-  let originResp: http.IncomingMessage
+  let originResp: Response
 
   try {
-    originResp = await fetchOrigial(origin)
-    if (originResp.statusCode != 200) {
-      resp.statusCode = originResp.statusCode
-      originResp.pipe(resp)
+     originResp = await fetch(origin.href)
+    // originResp = await fetchOrigial(origin)
+    if (originResp.status != 200) {
+      resp.statusCode = originResp.status
+      originResp.body.pipe(resp)
       return
     }
   } catch (err) {
@@ -114,7 +118,8 @@ const server = http.createServer(async (req, resp) =>{
     return
   }
   
-  const contentType = headerOrDefault(originResp, "content-type", "")
+  
+  const contentType = originResp.headers.get("content-type") || ""
 
   if (!contentType.includes("image/")) {
     resp.statusCode = 400
@@ -136,7 +141,7 @@ const server = http.createServer(async (req, resp) =>{
       resp.setHeader(name, val)
     }
     resp.setHeader("timing-allow-origin", "*")
-    originResp.pipe(resp)
+    originResp.body.pipe(resp)
     return
   }
 
@@ -146,10 +151,12 @@ const server = http.createServer(async (req, resp) =>{
   
   let startTime = new Date().getTime();
 
+  const inBuf = await originResp.buffer()
+
   q.push(function (cb) {
     const queueTime = new Date().getTime() - startTime
     // const etag = [origin.href, url.search].map(md5).join("/");
-    const img = gm(originResp);
+    const img = gm(inBuf);
     //@ts-ignore
     img._options.imageMagick = true;
 
@@ -161,12 +168,8 @@ const server = http.createServer(async (req, resp) =>{
     })
 
     //const img = gm(req).out("-contrast-stretch","2%", "1%");
-    let dataIn = 0;
+    let dataIn = inBuf.length;
     let dataOut = 0;
-
-    originResp.on('data', (chunk) => {
-      dataIn += chunk.length
-    });
 
     img.toBuffer((err, buf) => {
       if (err){
@@ -181,12 +184,12 @@ const server = http.createServer(async (req, resp) =>{
         "timing-allow-origin": "*",
         "content-type": contentType,
         "content-length": buf.length,
-        etag: originResp.headers['etag'],
-        "last-modified": originResp.headers["last-modified"],
+        etag: originResp.headers.get("etag"),
+        "last-modified": originResp.headers.get("last-modified"),
       }, responseHeaders));
       resp.end(buf);
       req.socket.end();
-      console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, queue:${queueTime}ms, process:${new Date().getTime() - startTime - queueTime}ms`);
+      console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, queue:${queueTime}ms, process:${new Date().getTime() - startTime - queueTime}ms, total:${new Date().getTime() - startTime}`);
       cb()
     })
   })
