@@ -141,9 +141,9 @@ const server = http.createServer(async (req, resp) =>{
   }
 
   if (url.search.length == 0) {
-    for (const [name, val] of Object.entries(originResp.headers)) {
+    originResp.headers.forEach((name, val) => {
       resp.setHeader(name, val)
-    }
+    })
     resp.setHeader("timing-allow-origin", "*")
     originResp.body.pipe(resp)
     return
