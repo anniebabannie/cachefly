@@ -147,7 +147,7 @@ const server = http.createServer(async (req, resp) =>{
   let dataIn = 0;
   let dataOut = 0;
   let startTime = new Date().getTime();
-  req.on('data', (chunk) => {
+  originResp.on('data', (chunk) => {
     dataIn += chunk.length
   });
 
