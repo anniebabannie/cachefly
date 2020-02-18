@@ -11,7 +11,7 @@ var crypto = require('crypto');
 crypto.createHash('md5').update(data).digest("hex");
 */
 
-const q = queue({autostart: true, concurrency: 2})
+const q = queue({autostart: true, concurrency: 4})
 
 q.start(function (err) {
   if (err) {
