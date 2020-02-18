@@ -81,9 +81,10 @@ const authToken = process.env.AUTH_TOKEN;
 const server = http.createServer(async (req, resp) =>{
   console.log([req.httpVersion, req.socket.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
 
-  if((req.method === "HEAD" || req.method === "GET") && req.url === "/__status"){
+  if ((req.method === "HEAD" || req.method === "GET") && req.url === "/__status") {
+    console.debug("imagemagick queue length", q.length)
     resp.writeHead(200, { connection: "close"} );
-    resp.end("ok")
+    resp.end("ok: " + q.length)
     return
   }
 
