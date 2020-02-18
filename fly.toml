@@ -10,13 +10,14 @@ app = "magick"
     soft_limit = 40
 
   [[services.ports]]
-    handlers = []
+    handlers = ["http"]
     port = "80"
 
   [[services.ports]]
-    handlers = ["tls", ]
+    handlers = ["tls", "http"]
     port = "443"
 
-  [[services.tcp_checks]]
+  [[services.http_checks]]
     interval = 10000
     timeout = 2000
+    http_path = "/__status"
