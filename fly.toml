@@ -6,8 +6,8 @@ app = "magick"
   protocol = "tcp"
 
   [services.concurrency]
-    hard_limit = 25
-    soft_limit = 20
+    hard_limit = 500
+    soft_limit = 40
 
   [[services.ports]]
     handlers = ["http"]
@@ -17,6 +17,7 @@ app = "magick"
     handlers = ["tls", "http"]
     port = "443"
 
-  [[services.tcp_checks]]
+  [[services.http_checks]]
     interval = 10000
     timeout = 2000
+    http_path = "/__status"

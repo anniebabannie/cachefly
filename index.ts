@@ -168,11 +168,13 @@ const server = http.createServer(async (req, resp) =>{
       "last-modified": originResp.headers["last-modified"],
     }, responseHeaders));
     resp.end(buf);
+    req.socket.end();
     console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, ${new Date().getTime() - startTime}ms`);
   })
 })
 server.on("connection", (socket) => {
   console.log([socket.remoteAddress, "TCP connection"].join(" "))
+  socket.setKeepAlive(false)
 })
 server.listen(8080);
 console.log(`http server listening on port 8080`)
