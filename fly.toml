@@ -7,7 +7,7 @@ app = "cachefly-magick"
 
   [services.concurrency]
     hard_limit = 30
-    soft_limit = 10
+    soft_limit = 8
 
   [[services.ports]]
     handlers = ["http"]

@@ -110,11 +110,17 @@ const bootTime = new Date();
 let lastQueueLength = 0;
 let lastProcessedCount = 0
 const server = http.createServer(async (req, resp) =>{
-  console.log([req.httpVersion, req.socket.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
+  //console.log([req.httpVersion, req.socket.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
 
   if ((req.method === "HEAD" || req.method === "GET") && req.url === "/__status") {
     const now = new Date();
-    console.debug("imagemagick queue length:", q.length, "last queue length: ", lastQueueLength, "processed count:", processedCount, "last processed count:", lastProcessedCount, "uptime:", (now.getTime() - bootTime.getTime()) / 1000)
+    console.debug(
+      "imagemagick queue length:", q.length.toString(),
+      "last queue length:", lastQueueLength.toString(),
+      "processed count:", processedCount.toString(),
+      "last processed count:", lastProcessedCount.toString(),
+      "uptime:", ((now.getTime() - bootTime.getTime()) / 1000).toString(),
+    );
     lastQueueLength = q.length;
     lastProcessedCount = processedCount
     resp.writeHead(200, { connection: "close"} );
