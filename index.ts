@@ -12,6 +12,10 @@ var crypto = require('crypto');
 crypto.createHash('md5').update(data).digest("hex");
 */
 
+const agent = new http.Agent({
+  keepAlive: true
+});
+
 const q = queue({autostart: true, concurrency: 4, timeout: 20000})
 let processedCount = 0
 
@@ -104,7 +108,6 @@ function headerOrDefault(req: http.IncomingMessage, name: string, defaultVal : s
   return defaultVal
 }
 
-const authToken = process.env.AUTH_TOKEN;
 // fly deploy:image registry-1.docker.io/nginxdemos/hello:latest
 const bootTime = new Date();
 let lastQueueLength = 0;
@@ -142,7 +145,7 @@ const server = http.createServer(async (req, resp) =>{
   let originResp: Response
 
   try {
-     originResp = await fetch(origin.href, {timeout: 20000})
+     originResp = await fetch(origin.href, {timeout: 20000, agent: agent})
     // originResp = await fetchOrigial(origin)
     if (originResp.status != 200) {
       resp.statusCode = originResp.status
@@ -150,8 +153,8 @@ const server = http.createServer(async (req, resp) =>{
       return
     }
   } catch (err) {
-    console.error("origin error", err)
-    resp.statusCode = 500
+    console.error("origin error", err.message, url.toString());
+    resp.statusCode = 503
     resp.end("Error fetching from origin")
     return
   }
@@ -216,24 +219,31 @@ const server = http.createServer(async (req, resp) =>{
         return;
       }
       if (err){
-        console.trace("error:", err.message);
+        console.error("error:", err.message);
         resp.writeHead(500)
         //@ts-ignore
-        resp.end("error processing image", url);
+        resp.end(`error processing image: #{url}`);
         cb();
         return;
       }
       dataOut = buf.length;
+      if(q.length > 1){
+        responseHeaders.connection = "close";
+      }
       resp.writeHead(200, Object.assign({
         "timing-allow-origin": "*",
         "content-type": contentType,
         "content-length": buf.length,
         etag: originResp.headers.get("etag"),
         "last-modified": originResp.headers.get("last-modified"),
+        "x-origin-ms": bufferTime,
+        "x-queue-ms": queueTime,
+        "x-process-ms": new Date().getTime() - startTime - bufferTime - queueTime,
+        "x-original-size": dataIn, 
       }, responseHeaders));
       resp.end(buf);
       // req.socket.end();
-      console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, download:${bufferTime}ms, queue:${queueTime}ms, process:${new Date().getTime() - startTime - bufferTime - queueTime}ms, total:${new Date().getTime() - startTime}`);
+      //console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, download:${bufferTime}ms, queue:${queueTime}ms, process:${new Date().getTime() - startTime - bufferTime - queueTime}ms, total:${new Date().getTime() - startTime}`);
       cb();
     })
   };
@@ -241,9 +251,8 @@ const server = http.createServer(async (req, resp) =>{
   q.push(Object.assign(worker, { resp, url }) as QueueWorker)
 })
 server.on("connection", (socket) => {
-  console.log([socket.remoteAddress, "TCP connection"].join(" "))
+  //console.log([socket.remoteAddress, "TCP connection"].join(" "))
   // socket.setKeepAlive(false)
 })
 server.listen(8080);
 console.log(`http server listening on port 8080`)
-console.log(`Auth token: ${authToken}`)
