@@ -227,9 +227,6 @@ const server = http.createServer(async (req, resp) =>{
         return;
       }
       dataOut = buf.length;
-      if(q.length > 1){
-        responseHeaders.connection = "close";
-      }
       resp.writeHead(200, Object.assign({
         "timing-allow-origin": "*",
         "content-type": contentType,
