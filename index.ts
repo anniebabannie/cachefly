@@ -1,7 +1,7 @@
 import http from 'http';
 import gm from 'gm';
 import { createHash } from 'crypto';
-import queue from "queue";
+import queue, { QueueWorker } from "queue";
 import fetch, { Response } from "node-fetch";
 
 function md5(input:string){
@@ -12,7 +12,7 @@ var crypto = require('crypto');
 crypto.createHash('md5').update(data).digest("hex");
 */
 
-const q = queue({autostart: true, concurrency: 4})
+const q = queue({autostart: true, concurrency: 4, timeout: 20000})
 let processedCount = 0
 
 // get notified when jobs complete
@@ -20,6 +20,24 @@ q.on('success', function (result, job) {
   processedCount += 1
 })
 
+// job timed out
+q.on('timeout', function (next, job) {
+  const url: string | undefined = job.url as string;
+
+  if(job.url){
+    console.error('job timed out:', url.toString());
+  }else{
+    console.error('job timed out: <unknown>')
+  }
+  if(job.resp){
+    const resp = job.resp as http.ServerResponse;
+    if(resp.writableEnded){
+      resp.writeHead(504);
+      resp.end("Image processing timed out");
+    }
+  }
+  next()
+});
 
 q.start(function (err) {
   if (err) {
@@ -117,7 +135,7 @@ const server = http.createServer(async (req, resp) =>{
   let originResp: Response
 
   try {
-     originResp = await fetch(origin.href)
+     originResp = await fetch(origin.href, {timeout: 20000})
     // originResp = await fetchOrigial(origin)
     if (originResp.status != 200) {
       resp.statusCode = originResp.status
@@ -164,10 +182,11 @@ const server = http.createServer(async (req, resp) =>{
 
   const inBuf = await originResp.buffer()
 
-  q.push(function (cb) {
+  const worker = function (cb) {
     const queueTime = new Date().getTime() - startTime
     // const etag = [origin.href, url.search].map(md5).join("/");
     const img = gm(inBuf);
+
     //@ts-ignore
     img._options.imageMagick = true;
 
@@ -183,11 +202,18 @@ const server = http.createServer(async (req, resp) =>{
     let dataOut = 0;
 
     img.toBuffer((err, buf) => {
+      if(resp.writableEnded){
+        // wat
+        console.error('write already happened:', url)
+        cb();
+        return;
+      }
       if (err){
         console.trace("error:", err.message);
         resp.writeHead(500)
         //@ts-ignore
-        resp.end("error processing image");
+        resp.end("error processing image", url);
+        cb();
         return;
       }
       dataOut = buf.length;
@@ -201,9 +227,11 @@ const server = http.createServer(async (req, resp) =>{
       resp.end(buf);
       // req.socket.end();
       console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, queue:${queueTime}ms, process:${new Date().getTime() - startTime - queueTime}ms, total:${new Date().getTime() - startTime}`);
-      cb()
+      cb();
     })
-  })
+  };
+
+  q.push(Object.assign(worker, { resp, url }) as QueueWorker)
 })
 server.on("connection", (socket) => {
   console.log([socket.remoteAddress, "TCP connection"].join(" "))
