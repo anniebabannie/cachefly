@@ -132,6 +132,7 @@ const server = http.createServer(async (req, resp) =>{
     url.search = headerOrDefault(req, "Image-Operation", "");
   }
   
+  let startTime = new Date().getTime();
   let originResp: Response
 
   try {
@@ -178,12 +179,12 @@ const server = http.createServer(async (req, resp) =>{
 
   // original magick server that's now inside a queue for concurrency control...
 
-  let startTime = new Date().getTime();
-
   const inBuf = await originResp.buffer()
 
+  const bufferTime = new Date().getTime() - startTime;
+
   const worker = function (cb) {
-    const queueTime = new Date().getTime() - startTime
+    const queueTime = new Date().getTime() - startTime - bufferTime;
     // const etag = [origin.href, url.search].map(md5).join("/");
     const img = gm(inBuf);
 
@@ -226,7 +227,7 @@ const server = http.createServer(async (req, resp) =>{
       }, responseHeaders));
       resp.end(buf);
       // req.socket.end();
-      console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, queue:${queueTime}ms, process:${new Date().getTime() - startTime - queueTime}ms, total:${new Date().getTime() - startTime}`);
+      console.log(`${origin}${url.search}, ${dataIn / 1024}kB input, ${dataOut / 1024}kB output, download:${bufferTime}ms, queue:${queueTime}ms, process:${new Date().getTime() - startTime - bufferTime - queueTime}ms, total:${new Date().getTime() - startTime}`);
       cb();
     })
   };
