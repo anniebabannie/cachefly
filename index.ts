@@ -154,8 +154,8 @@ const server = http.createServer(async (req, resp) =>{
     }
   } catch (err) {
     console.error("origin error", err.message, url.toString());
-    resp.statusCode = 503
-    resp.end("Error fetching from origin")
+    resp.writeHead(503, { "connection": "keep-alive"});
+    resp.end("Error fetching from origin");
     return
   }
   
