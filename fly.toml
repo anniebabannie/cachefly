@@ -6,8 +6,18 @@ app = "cachefly-magick"
   protocol = "tcp"
 
   [services.concurrency]
-    hard_limit = 30
+    hard_limit = 50
     soft_limit = 8
+
+  [[services.http_checks]]
+    interval = 10000
+    method = "get"
+    path = "/__status"
+    protocol = "http"
+    timeout = 2000
+    tls_skip_verify = false
+
+    [services.http_checks.headers]
 
   [[services.ports]]
     handlers = ["http"]
@@ -16,8 +26,3 @@ app = "cachefly-magick"
   [[services.ports]]
     handlers = ["tls", "http"]
     port = "443"
-
-  [[services.http_checks]]
-    interval = 10000
-    timeout = 2000
-    http_path = "/__status"

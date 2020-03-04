@@ -18,6 +18,7 @@ const agent = new http.Agent({
 
 const q = queue({autostart: true, concurrency: 4, timeout: 20000})
 let processedCount = 0
+let connectionCount = 0
 
 // get notified when jobs complete
 q.on('success', function (result, job) {
@@ -117,12 +118,13 @@ const server = http.createServer(async (req, resp) =>{
 
   if ((req.method === "HEAD" || req.method === "GET") && req.url === "/__status") {
     const now = new Date();
-    console.debug(
-      "imagemagick queue length:", q.length.toString(),
-      "last queue length:", lastQueueLength.toString(),
-      "processed count:", processedCount.toString(),
-      "last processed count:", lastProcessedCount.toString(),
-      "uptime:", ((now.getTime() - bootTime.getTime()) / 1000).toString(),
+    console.debug([
+      "imagemagick queue length: " + q.length.toString(),
+      "last queue length: " + lastQueueLength.toString(),
+      "processed: " + `${processedCount - lastProcessedCount}/${processedCount}`,
+      "connections: " + connectionCount.toString(),
+      "uptime: " + ((now.getTime() - bootTime.getTime()) / 1000).toString(),
+    ].join(", ")
     );
     lastQueueLength = q.length;
     lastProcessedCount = processedCount
@@ -188,6 +190,9 @@ const server = http.createServer(async (req, resp) =>{
 
   // original magick server that's now inside a queue for concurrency control...
 
+  // @ts-ignore
+  req.socket.requestCount += 1;
+
   const inBuf = await originResp.buffer()
 
   const bufferTime = new Date().getTime() - startTime;
@@ -227,6 +232,11 @@ const server = http.createServer(async (req, resp) =>{
         return;
       }
       dataOut = buf.length;
+
+      //@ts-ignore
+      if(req.socket.requestCount > 4){
+        responseHeaders.connection = "close";
+      }
       resp.writeHead(200, Object.assign({
         "timing-allow-origin": "*",
         "content-type": contentType,
@@ -250,6 +260,8 @@ const server = http.createServer(async (req, resp) =>{
 server.on("connection", (socket) => {
   //console.log([socket.remoteAddress, "TCP connection"].join(" "))
   // socket.setKeepAlive(false)
+  connectionCount += 1;
+  Object.assign(socket, {requestCount: 0 })
 })
 server.listen(8080);
 console.log(`http server listening on port 8080`)
