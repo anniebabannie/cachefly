@@ -136,6 +136,7 @@ const server = http.createServer(async (req, resp) =>{
   const responseHeaders: http.OutgoingHttpHeaders = {}
   const url = new URL(req.url, "http://magick");
 
+  //const originBase = headerOrDefault(req, "Image-Origin", "http://dealercarsearch-sf.static-ord.sctgos.com/")
   const originBase = headerOrDefault(req, "Image-Origin", "http://dealercarsearch2.cachefly.net/");
   const origin = new URL(url.pathname.substr(1), originBase);
   const accept = headerOrDefault(req, "accept", "");
