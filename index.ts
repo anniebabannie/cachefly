@@ -68,20 +68,6 @@ function intOrUndefined(raw: string | null | undefined): number | undefined{
   return undefined;
 }
 
-
-
-function fetchOrigial(url: URL): Promise<http.IncomingMessage> {
-  return new Promise((resolve, reject) => {
-    try {
-      http.get(url, (response) => {
-        resolve(response)
-      })
-    } catch (err) {
-      reject(err)
-    }
-  })
-}
-
 const filters = new Map<string,FilterFunction> ([
   ["auto_fix", (img, value) => value === "true" ? img.out("-contrast-stretch","2%", "1%") : img],
   ["flip", (img, value) =>value === "true" ? img.flip() : img],
@@ -109,7 +95,6 @@ function headerOrDefault(req: http.IncomingMessage, name: string, defaultVal : s
   return defaultVal
 }
 
-// fly deploy:image registry-1.docker.io/nginxdemos/hello:latest
 const bootTime = new Date();
 let lastQueueLength = 0;
 let lastProcessedCount = 0
@@ -194,7 +179,15 @@ const server = http.createServer(async (req, resp) =>{
   // @ts-ignore
   req.socket.requestCount += 1;
 
-  const inBuf = await originResp.buffer()
+  let inBuf: Buffer
+  try {
+    inBuf = await originResp.buffer()
+  } catch (error) {
+    console.error('error reading origin body:', error)
+    resp.writeHead(504, { "connection": "keep-alive"});
+    resp.end("Error fetching from origin");
+    return
+  }
 
   const bufferTime = new Date().getTime() - startTime;
 
