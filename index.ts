@@ -79,7 +79,7 @@ const server = http.createServer(async (req, resp) =>{
 
   const cachedFilename = getCachedFilename(url);
 
-  const cachedImg = await fetch(`${process.env.AWS_ENDPOINT_URL_S3}/${process.env.BUCKET_NAME}/${cachedFilename}`, {timeout: 20000, agent: agent});
+  const cachedImg = await fetch(`${process.env.AWS_ENDPOINT_URL_S3}/${process.env.BUCKET_NAME}/${cachedFilename}`, {timeout: 20000, agent: agent, method: "HEAD"});
   if (cachedImg.status === 200) {
     const extension = url.pathname.split(".").pop();
     console.log("serving cached image.......", url.href)
