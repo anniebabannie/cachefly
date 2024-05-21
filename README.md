@@ -26,4 +26,12 @@ From there, you can include any of the following URL params to optimize your ima
 - `quality` (1 - 100)
 - `format` (e.g. `jpg`, `png`, etc)
 
+A sample URL with the params included might look like this:
+
+```
+https://$YOUR_IMG_OPT_APP/blog/2024/hero.jpg?width=300&format=webp
+```
+
+The optimized image will be stored in a `cache` directory at the root of your Tigris bucket. When a previously optimized image is requested, it will be served directly from Tigris instead of re-running the optimizer.
+
 This app uses package [sharp](https://sharp.pixelplumbing.com/) to perform the image transformations. For a full list of supported file extensions, check out their documentation.
