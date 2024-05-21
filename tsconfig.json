@@ -7,7 +7,8 @@
     "outDir": "./src/js",
     "sourceMap": true,
     "target": "ES2019",
-    "lib": ["esnext","dom"]
+    "lib": ["esnext","dom"],
+    "strict": true
   },
   "include": [
     "*"

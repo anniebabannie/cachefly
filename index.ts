@@ -3,6 +3,7 @@ import gm from 'gm';
 import { createHash } from 'crypto';
 import queue, { QueueWorker } from "queue";
 import fetch, { Response } from "node-fetch";
+import sharp, { Sharp } from 'sharp';
 
 function md5(input:string){
   return createHash('md5').update(input).digest("hex");
@@ -56,10 +57,10 @@ interface RequestOptions{
   responseHeaders: http.OutgoingHttpHeaders
 }
 interface FilterFunction{
-  (img: gm.State, value: any, opts: RequestOptions): void;
+  (img: Sharp, value: any, opts: RequestOptions): void;
 }
 
-function intOrUndefined(raw: string | null | undefined): number | undefined{
+function intOrUndefined(raw: string | null | undefined): number | undefined {
   if(typeof raw === "string"){
     const v = parseInt(raw);
     if(isNaN(v)) return undefined;
@@ -68,24 +69,24 @@ function intOrUndefined(raw: string | null | undefined): number | undefined{
   return undefined;
 }
 
-const filters = new Map<string,FilterFunction> ([
-  ["auto_fix", (img, value) => value === "true" ? img.out("-contrast-stretch","2%", "1%") : img],
-  ["flip", (img, value) =>value === "true" ? img.flip() : img],
-  ["sharp_radius", (img, value, {url}) => img.sharpen(
-    intOrUndefined(url.searchParams.get("sharp_radius")) || 1,
-    intOrUndefined(url.searchParams.get("sharp_amount"))
-  )],
-  ["width", (img, value, {url}) => img.resize(
-    intOrUndefined(value),
-    intOrUndefined(url.searchParams.get("height")),
-    url.searchParams.get("crop") == "stretch" ? "!" : undefined
-  )],
-  ["quality", (img, value) => img.quality(intOrUndefined(value))],
-  ["format", (img, value, {responseHeaders}) => {
-    img.setFormat(value)
-    responseHeaders['content-type'] = `image/${value}`;
-  }]
-]);
+// export const filters = new Map<string,FilterFunction> ([
+//   // ["auto_fix", (img, value) => value === "true" ? img.out("-contrast-stretch","2%", "1%") : img],
+//   // ["flip", (img, value) =>value === "true" ? img.flip() : img],
+//   // ["sharp_radius", (img, value, {url}) => img.sharpen(
+//   //   intOrUndefined(url.searchParams.get("sharp_radius")) || 1,
+//   //   intOrUndefined(url.searchParams.get("sharp_amount"))
+//   // )],
+//   ["width", (img, value, {url}) => img.resize(
+//     intOrUndefined(value) as number,
+//     intOrUndefined(url.searchParams.get("height")),
+//     url.searchParams.get("crop") == "stretch" ? "!" : undefined
+//   )],
+//   ["quality", (img, value) => img.quality(intOrUndefined(value) as number)],
+//   ["format", (img, value, {responseHeaders}) => {
+//     img.setFormat(value)
+//     responseHeaders['content-type'] = `image/${value}`;
+//   }]
+// ]);
 
 function headerOrDefault(req: http.IncomingMessage, name: string, defaultVal : string): string {
   const val = req.headers[name.toLowerCase()]
@@ -98,8 +99,8 @@ function headerOrDefault(req: http.IncomingMessage, name: string, defaultVal : s
 const bootTime = new Date();
 let lastQueueLength = 0;
 let lastProcessedCount = 0
+
 const server = http.createServer(async (req, resp) =>{
-  //console.log([req.httpVersion, req.socket.remoteAddress, req.url, req.headers["user-agent"]].join(" "))
 
   if ((req.method === "HEAD" || req.method === "GET") && req.url === "/__status") {
     const now = new Date();
@@ -119,34 +120,36 @@ const server = http.createServer(async (req, resp) =>{
   }
 
   const responseHeaders: http.OutgoingHttpHeaders = {}
-  const url = new URL(req.url, "http://magick");
+  if (!req.url || req.url === "/favicon.ico") return;
+  // Add the Tigris dev domain to the image URL requested
+  const url = new URL(req.url, "https://fly.storage.tigris.dev/");
 
   //const originBase = headerOrDefault(req, "Image-Origin", "http://dealercarsearch-sf.static-ord.sctgos.com/")
-  const originBase = headerOrDefault(req, "Image-Origin", "http://dealercarsearch2.cachefly.net/");
-  const origin = new URL(url.pathname.substr(1), originBase);
+  // const originBase = headerOrDefault(req, "Image-Origin", "https://fly.storage.tigris.dev/");
+  // const origin = new URL(url.pathname.substr(1), originBase);
   const accept = headerOrDefault(req, "accept", "");
   if (url.search.length < 1) {
     url.search = headerOrDefault(req, "Image-Operation", "");
   }
   
   let startTime = new Date().getTime();
-  let originResp: Response
+  let originResp: fetch.Response
 
   try {
-     originResp = await fetch(origin.href, {timeout: 20000, agent: agent})
-    // originResp = await fetchOrigial(origin)
+    console.log("fetching image URL.......", url.href)
+    originResp = await fetch(url.href, {timeout: 20000, agent: agent})
     if (originResp.status != 200) {
+      console.log("origin status was NOT 200")
       resp.statusCode = originResp.status
       originResp.body.pipe(resp)
       return
     }
   } catch (err) {
-    console.error("origin error", err.message, url.toString());
+    console.error("origin error", err, url.toString());
     resp.writeHead(503, { "connection": "keep-alive"});
     resp.end("Error fetching from origin");
     return
   }
-  
   
   const contentType = originResp.headers.get("content-type") || ""
 
@@ -174,15 +177,17 @@ const server = http.createServer(async (req, resp) =>{
     return
   }
 
+
   // original magick server that's now inside a queue for concurrency control...
 
   // @ts-ignore
   req.socket.requestCount += 1;
 
-  let inBuf: Buffer
+  let inBuf: ArrayBuffer
   try {
-    inBuf = await originResp.buffer()
+    inBuf = await originResp.arrayBuffer()
   } catch (error) {
+    console.log(originResp.status)
     console.error('error reading origin body:', error)
     resp.writeHead(504, { "connection": "keep-alive"});
     resp.end("Error fetching from origin");
@@ -191,13 +196,14 @@ const server = http.createServer(async (req, resp) =>{
 
   const bufferTime = new Date().getTime() - startTime;
 
-  const worker = function (cb) {
+  const worker = function (cb: Function) {
     const queueTime = new Date().getTime() - startTime - bufferTime;
     // const etag = [origin.href, url.search].map(md5).join("/");
-    const img = gm(inBuf);
+    // const img = gm(inBuf);
+    const img = sharp(inBuf);
 
     //@ts-ignore
-    img._options.imageMagick = true;
+    // img._options.imageMagick = true;
 
     url.searchParams.forEach((value, key) => {
       const filter = filters.get(key);
@@ -207,8 +213,8 @@ const server = http.createServer(async (req, resp) =>{
     })
 
     //const img = gm(req).out("-contrast-stretch","2%", "1%");
-    let dataIn = inBuf.length;
-    let dataOut = 0;
+    // let dataIn = inBuf.length;
+    // let dataOut = 0;
 
     img.toBuffer((err, buf) => {
       if(resp.writableEnded){
@@ -225,7 +231,7 @@ const server = http.createServer(async (req, resp) =>{
         cb();
         return;
       }
-      dataOut = buf.length;
+      // dataOut = buf.length;
 
       //@ts-ignore
       if(req.socket.requestCount > 4){
@@ -240,7 +246,7 @@ const server = http.createServer(async (req, resp) =>{
         "x-origin-ms": bufferTime,
         "x-queue-ms": queueTime,
         "x-process-ms": new Date().getTime() - startTime - bufferTime - queueTime,
-        "x-original-size": dataIn, 
+        // "x-original-size": dataIn, 
       }, responseHeaders));
       resp.end(buf);
       // req.socket.end();

@@ -1,28 +1,22 @@
-app = "cachefly-magick"
+# fly.toml app configuration file generated for cachefly-tigris on 2024-05-17T10:32:05-07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
+app = 'cachefly-tigris'
+primary_region = 'sea'
 
-[[services]]
+[build]
+
+[http_service]
   internal_port = 8080
-  protocol = "tcp"
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
-  [services.concurrency]
-    hard_limit = 50
-    soft_limit = 8
-
-  [[services.http_checks]]
-    interval = 10000
-    method = "get"
-    path = "/__status"
-    protocol = "http"
-    timeout = 2000
-    tls_skip_verify = false
-
-    [services.http_checks.headers]
-
-  [[services.ports]]
-    handlers = ["http"]
-    port = "80"
-
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = "443"
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1

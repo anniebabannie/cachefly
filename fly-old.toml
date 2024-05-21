@@ -1,0 +1,28 @@
+app = "cachefly-magick"
+
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [services.concurrency]
+    hard_limit = 50
+    soft_limit = 8
+
+  [[services.http_checks]]
+    interval = 10000
+    method = "get"
+    path = "/__status"
+    protocol = "http"
+    timeout = 2000
+    tls_skip_verify = false
+
+    [services.http_checks.headers]
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = "80"
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = "443"

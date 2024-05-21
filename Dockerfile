@@ -1,19 +1,39 @@
-ARG NODE_ENV=production
-FROM node:12-alpine
+# syntax = docker/dockerfile:1
 
-RUN apk update && apk add imagemagick && rm -rf /var/cache/apk/*
-# RUN npm install -g yarn
+# Adjust BUN_VERSION as desired
+ARG BUN_VERSION=1.0.13
+FROM oven/bun:${BUN_VERSION}-slim as base
 
+LABEL fly_launch_runtime="Bun"
+
+# Bun app lives here
 WORKDIR /app
 
-COPY package.json .
-COPY yarn.lock .
+# Set production environment
+ENV NODE_ENV="production"
 
-RUN yarn install --production
-#RUN npm install --production
 
-COPY . .
+# Throw-away build stage to reduce size of final image
+FROM base as build
 
-EXPOSE 8000
+# Install packages needed to build node modules
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y build-essential pkg-config python-is-python3
 
-CMD ["yarn", "ts-node", "index.ts"]
+# Install node modules
+COPY --link bun.lockb package.json ./
+RUN bun install --ci
+
+# Copy application code
+COPY --link . .
+
+
+# Final stage for app image
+FROM base
+
+# Copy built application
+COPY --from=build /app /app
+
+# Start the server by default, this can be overwritten at runtime
+EXPOSE 8080
+CMD [ "bun", "index.ts" ]
