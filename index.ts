@@ -68,7 +68,7 @@ const server = http.createServer(async (req, resp) =>{
   // const responseHeaders: http.OutgoingHttpHeaders = {}
   if (!req.url || req.url === "/favicon.ico") return;
   // Add the Tigris dev domain to the image URL requested
-  const url = new URL(req.url, "https://fly.storage.tigris.dev/");
+  const url = new URL(`${process.env.AWS_ENDPOINT_URL_S3}/${process.env.BUCKET_NAME}${req.url}`);
 
   const accept = headerOrDefault(req, "accept", "");
   if (url.search.length < 1) {
