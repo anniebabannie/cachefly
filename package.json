@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.577.0",
     "@jimp/plugin-normalize": "^0.6.4",
     "@types/gm": "^1.18.3",
     "@types/jimp": "^0.2.28",

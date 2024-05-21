@@ -3,7 +3,8 @@ import gm from 'gm';
 import { createHash } from 'crypto';
 import queue, { QueueWorker } from "queue";
 import fetch, { Response } from "node-fetch";
-import sharp, { Sharp } from 'sharp';
+import sharp, { FormatEnum, Sharp } from 'sharp';
+import { parse } from 'path';
 
 function md5(input:string){
   return createHash('md5').update(input).digest("hex");
@@ -69,24 +70,20 @@ function intOrUndefined(raw: string | null | undefined): number | undefined {
   return undefined;
 }
 
-// export const filters = new Map<string,FilterFunction> ([
-//   // ["auto_fix", (img, value) => value === "true" ? img.out("-contrast-stretch","2%", "1%") : img],
-//   // ["flip", (img, value) =>value === "true" ? img.flip() : img],
-//   // ["sharp_radius", (img, value, {url}) => img.sharpen(
-//   //   intOrUndefined(url.searchParams.get("sharp_radius")) || 1,
-//   //   intOrUndefined(url.searchParams.get("sharp_amount"))
-//   // )],
-//   ["width", (img, value, {url}) => img.resize(
-//     intOrUndefined(value) as number,
-//     intOrUndefined(url.searchParams.get("height")),
-//     url.searchParams.get("crop") == "stretch" ? "!" : undefined
-//   )],
-//   ["quality", (img, value) => img.quality(intOrUndefined(value) as number)],
-//   ["format", (img, value, {responseHeaders}) => {
-//     img.setFormat(value)
-//     responseHeaders['content-type'] = `image/${value}`;
-//   }]
-// ]);
+export const filters = new Map<string,FilterFunction> ([
+  ["width", (img, value, {url}) => img.resize(
+    parseInt(value), 
+    parseInt(url.searchParams.get("height") as string),
+  )],
+  ["quality", (img, value) => img.format(intOrUndefined(value) as number)],
+  ["format", (img, value, {responseHeaders}) => {
+    img.toFormat(
+      value as keyof FormatEnum,
+      { quality: 100} 
+    )
+    responseHeaders['content-type'] = `image/${value}`;
+  }]
+]);
 
 function headerOrDefault(req: http.IncomingMessage, name: string, defaultVal : string): string {
   const val = req.headers[name.toLowerCase()]
@@ -204,13 +201,27 @@ const server = http.createServer(async (req, resp) =>{
 
     //@ts-ignore
     // img._options.imageMagick = true;
-
-    url.searchParams.forEach((value, key) => {
-      const filter = filters.get(key);
-      if(filter){
-        filter(img, value, {url, responseHeaders});
-      }
-    })
+    if (url.searchParams.get("width") || url.searchParams.get("height")) {
+      img.resize(
+        intOrUndefined(url.searchParams.get("width")),
+        intOrUndefined(url.searchParams.get("height")),
+      )
+    }
+    if (url.searchParams.get("quality") || url.searchParams.get("format")) {
+      const quality = url.searchParams.get("quality") as string;
+      const format = url.searchParams.get("format");
+      img.toFormat(
+        format as keyof FormatEnum,
+        { quality: parseInt(quality) }
+      )
+      responseHeaders['content-type'] = `image/${format}`;
+    }
+    // url.searchParams.forEach((value, key) => {
+    //   const filter = filters.get(key);
+    //   if(filter){
+    //     filter(img, value, {url, responseHeaders});
+    //   }
+    // })
 
     //const img = gm(req).out("-contrast-stretch","2%", "1%");
     // let dataIn = inBuf.length;
