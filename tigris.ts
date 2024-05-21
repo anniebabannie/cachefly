@@ -1,6 +1,6 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, S3 } from '@aws-sdk/client-s3';
 
-const Tigris = new S3Client({ 
+const Tigris = new S3({ 
   region: 'auto',
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,

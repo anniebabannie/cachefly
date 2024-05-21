@@ -1,7 +1,7 @@
 import http from 'http';
 import queue, { QueueWorker } from "queue";
 import fetch from "node-fetch";
-import { headerOrDefault, workerJob } from './utils';
+import { getCachedFilename, headerOrDefault, workerJob } from './utils';
 
 const agent = new http.Agent({
   keepAlive: true
@@ -47,11 +47,12 @@ let lastQueueLength = 0;
 let lastProcessedCount = 0
 
 const server = http.createServer(async (req, resp) =>{
+  if (!req.url || req.url === "/favicon.ico") return;
 
   if ((req.method === "HEAD" || req.method === "GET") && req.url === "/__status") {
     const now = new Date();
     console.debug([
-      "imagemagick queue length: " + Queue.length.toString(),
+      "Image optimzation queue length: " + Queue.length.toString(),
       "last queue length: " + lastQueueLength.toString(),
       "processed: " + `${processedCount - lastProcessedCount}/${processedCount}`,
       "connections: " + connectionCount.toString(),
@@ -65,9 +66,7 @@ const server = http.createServer(async (req, resp) =>{
     return
   }
 
-  // const responseHeaders: http.OutgoingHttpHeaders = {}
-  if (!req.url || req.url === "/favicon.ico") return;
-  // Add the Tigris dev domain to the image URL requested
+  
   const url = new URL(`${process.env.AWS_ENDPOINT_URL_S3}/${process.env.BUCKET_NAME}${req.url}`);
 
   const accept = headerOrDefault(req, "accept", "");
@@ -76,7 +75,19 @@ const server = http.createServer(async (req, resp) =>{
   }
   
   let startTime = new Date().getTime();
-  let originResp: fetch.Response
+  let originResp: fetch.Response;
+
+  const cachedFilename = getCachedFilename(url);
+
+  const cachedImg = await fetch(`${process.env.AWS_ENDPOINT_URL_S3}/${process.env.BUCKET_NAME}/${cachedFilename}`, {timeout: 20000, agent: agent});
+  if (cachedImg.status === 200) {
+    const extension = url.pathname.split(".").pop();
+    console.log("serving cached image.......", url.href)
+    resp.setHeader("content-type", `image/${extension}`);
+    originResp = cachedImg;
+    originResp.body.pipe(resp);
+    return;
+  }
 
   try {
     console.log("fetching image URL.......", url.href)
@@ -134,10 +145,7 @@ const server = http.createServer(async (req, resp) =>{
     return
   }
 
-  contentType = url.searchParams.get("format") !== originResp.headers.get("content-type") ? `image/${url.searchParams.get("format")}` : originResp.headers.get("content-type") || ""
-
   const bufferTime = new Date().getTime() - startTime;
-  // const worker = workerJob.bind(null, {inBuf, startTime, bufferTime, originResp, url, resp, req})
 
   const worker = function (cb: Function) {
     workerJob({inBuf, startTime, bufferTime, originResp, url, resp, req, cb});
@@ -146,8 +154,6 @@ const server = http.createServer(async (req, resp) =>{
   Queue.push(Object.assign(worker, { resp, url }) as QueueWorker)
 })
 server.on("connection", (socket) => {
-  //console.log([socket.remoteAddress, "TCP connection"].join(" "))
-  // socket.setKeepAlive(false)
   connectionCount += 1;
   Object.assign(socket, {requestCount: 0 })
 })
